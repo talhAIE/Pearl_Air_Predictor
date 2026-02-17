@@ -1,0 +1,23 @@
+# Core dependencies
+pandas<3.0.0
+numpy<2.0.0
+python-dotenv
+
+# Machine Learning
+scikit-learn
+xgboost
+lightgbm
+joblib
+
+# Database
+pymongo
+certifi
+
+# API
+requests
+
+# Dashboard
+streamlit==1.38.0
+pillow
+plotly
+altair<5

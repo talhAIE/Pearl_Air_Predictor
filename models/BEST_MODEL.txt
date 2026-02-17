@@ -1,0 +1,36 @@
+ BEST MODEL 
+
+
+Model: LightGBM
+File: best_model_lightgbm.pkl
+
+Performance Metrics:
+-------------------
+R² Score:  0.8229  (82.3% variance explained)
+RMSE:      34.86   (Root Mean Squared Error)
+MAE:       14.68   (Mean Absolute Error)
+
+Model Parameters:
+----------------
+n_estimators:    300
+max_depth:       12
+learning_rate:   0.05
+num_leaves:      31
+subsample:       0.8
+random_state:    42
+
+Training Data:
+-------------
+Total Samples:   8,760 hours
+Train Set:       7,008 samples (80%)
+Test Set:        1,752 samples (20%)
+Features:        19 engineered features
+
+Model Selection:
+---------------
+LightGBM was selected as the best model after
+comparing Random Forest, XGBoost, and LightGBM
+across multiple experiments with hyperparameter
+tuning.
+
+
