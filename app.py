@@ -146,14 +146,8 @@ st.sidebar.markdown(
 )
 
 # Sidebar actions
-st.sidebar.markdown("### Actions")
-if RUNNING_IN_CLOUD:
-    st.sidebar.write(
-        "On Streamlit Cloud, data and forecasts are refreshed automatically "
-        "by GitHub Actions.\n\n"
-        "Use these buttons only when running the app locally."
-    )
-else:
+if not RUNNING_IN_CLOUD:
+    st.sidebar.markdown("### Actions")
     if st.sidebar.button("Collect fresh data", use_container_width=True):
         collect_fresh_data()
     st.sidebar.caption("Fetch latest hour from OpenMeteo into MongoDB.")
