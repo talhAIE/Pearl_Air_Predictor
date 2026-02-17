@@ -1,15 +1,10 @@
-"""
-AQI Calculation Script
-Calculates Air Quality Index from pollutant concentrations using EPA standards
-"""
-
 import pandas as pd
 import numpy as np
 from pathlib import Path
 
 
 # EPA AQI Breakpoints
-# Format: (C_low, C_high, I_low, I_high)
+# Format(C_low, C_high, I_low, I_high)
 
 PM25_BREAKPOINTS = [
     (0.0, 12.0, 0, 50),

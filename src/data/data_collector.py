@@ -1,8 +1,3 @@
-"""
-Data Collection Script for AQI Predictor
-Fetches air quality and weather data from OpenMeteo API
-"""
-
 import os
 import pandas as pd
 import requests
@@ -10,7 +5,6 @@ from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Config
 load_dotenv()
 
 CITY = os.getenv("CITY_NAME", "Islamabad")
@@ -31,7 +25,6 @@ WEATHER_PARAMS = ["temperature_2m", "relative_humidity_2m", "surface_pressure", 
                   "wind_direction_10m", "precipitation", "cloud_cover"]
 
 
-# Helpers
 def fetch_api(url, params):
     """Fetch API data and return DataFrame."""
     try:

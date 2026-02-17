@@ -130,229 +130,151 @@ def load_latest_aqi():
 
 
 # Main Dashboard
-st.title("🌍 AQI Predictor Dashboard")
-st.markdown("Real-time Air Quality Index prediction for Islamabad")
+st.title("Pearls AQI Monitor")
+st.caption("Clean 3‑day AQI outlook for Islamabad, powered by your own pipeline.")
 
-# Sidebar
-st.sidebar.header("About")
-st.sidebar.info(
+# Sidebar – simplified, project-specific copy
+st.sidebar.title("Pearls AQI")
+st.sidebar.markdown(
     """
-    This dashboard shows:
-    - Current AQI
-    - 3-day forecast
-    - Model performance comparison
-    
-    **Best Model:** LightGBM
-    **Accuracy:** R² = 0.82
+    Track **current air quality** and a **72‑hour forecast** for Islamabad.
     """
 )
 
-st.sidebar.markdown("### 🤖 Automation")
-st.sidebar.caption(
-    """
-    - **Data Collection**: Every hour
-    - **Model Training**: Daily at 2 AM UTC
-    - **Predictions**: Daily at 3 AM UTC
-    
-    *Note: OpenMeteo API data has 1-2 hour delay.  
-    Current AQI shows model prediction for accuracy.*
-    """
-)
-
-# Refresh predictions button
-st.sidebar.markdown("---")
-st.sidebar.header("Actions")
-
-if st.sidebar.button("📡 Collect Fresh Data", use_container_width=True):
+# Sidebar actions
+st.sidebar.markdown("### Actions")
+if st.sidebar.button("Collect fresh data", use_container_width=True):
     collect_fresh_data()
-st.sidebar.caption("Fetch latest AQI data (runs locally)")
+st.sidebar.caption("Fetch latest hour from OpenMeteo into MongoDB.")
 
-st.sidebar.markdown("")  # Spacing
-
-if st.sidebar.button("🔄 Regenerate Predictions", use_container_width=True):
+if st.sidebar.button("Regenerate 3‑day forecast", use_container_width=True):
     refresh_predictions()
-st.sidebar.caption("Regenerate 72-hour forecast (runs locally)")
+st.sidebar.caption("Run prediction pipeline with the latest best model.")
 
 # Load data
 registry = load_model_registry()
 predictions_df = load_predictions()
 latest_data = load_latest_aqi()
 
-# Row 1: Current AQI
-st.header("📊 Current AQI")
+# --- Top section: current AQI + model snapshot ---
+current_col, model_col = st.columns([2, 1])
 
-col1, col2, col3 = st.columns(3)
+with current_col:
+    st.subheader("Current air quality")
 
-# Use first prediction as "current" AQI since it's more up-to-date
-if not predictions_df.empty:
-    # Get the first (earliest) prediction - this is the most current estimate
-    first_prediction = predictions_df.iloc[0]
-    current_aqi = int(first_prediction['predicted_aqi'])
-    current_timestamp = first_prediction['timestamp']
-    category, color = get_aqi_category(current_aqi)
-    
-    with col1:
-        st.metric(
-            label="Current AQI (Estimated)",
-            value=current_aqi,
-            delta=category
-        )
-        # Show when predictions were generated
-        if 'prediction_date' in first_prediction:
-            pred_date = pd.to_datetime(first_prediction['prediction_date'])
-            # Convert to Pakistan time (UTC+5)
+    # Default values
+    current_aqi = None
+    category = None
+
+    if not predictions_df.empty:
+        # Use first prediction as current estimate
+        first_prediction = predictions_df.iloc[0]
+        current_aqi = int(first_prediction["predicted_aqi"])
+        category, _ = get_aqi_category(current_aqi)
+
+        st.metric("AQI (estimated)", current_aqi, category)
+
+        if "prediction_date" in first_prediction:
+            pred_date = pd.to_datetime(first_prediction["prediction_date"])
             from datetime import timedelta
-            pred_date_pk = pred_date + timedelta(hours=5)
-            st.caption(f"📊 Predictions generated: {pred_date_pk.strftime('%b %d, %H:%M')} PKT")
-        else:
-            st.caption("📊 Based on latest model prediction")
-    
-    with col2:
-        st.metric(
-            label="Location",
-            value="Islamabad, Pakistan"
-        )
-    
-    with col3:
-        if registry:
-            st.metric(
-                label="Model Used",
-                value=registry['best_model'].upper()
-            )
-elif latest_data:
-    # Fallback to actual data if no predictions available
-    current_aqi = int(latest_data['aqi'])
-    category, color = get_aqi_category(current_aqi)
-    latest_timestamp = pd.to_datetime(latest_data['timestamp'])
-    
-    with col1:
-        st.metric(
-            label="Current AQI (Measured)",
-            value=current_aqi,
-            delta=category
-        )
-        st.caption(f"Measured: {latest_timestamp.strftime('%Y-%m-%d %H:%M')}")
-    
-    with col2:
-        st.metric(
-            label="Location",
-            value="Islamabad, Pakistan"
-        )
-    
-    with col3:
-        if registry:
-            st.metric(
-                label="Model Used",
-                value=registry['best_model'].upper()
-            )
 
-# Row 2: 3-Day Forecast
-st.header("📈 3-Day Forecast")
+            pred_date_pk = pred_date + timedelta(hours=5)
+            st.caption(f"Predictions generated: {pred_date_pk.strftime('%b %d, %H:%M')} PKT")
+    elif latest_data:
+        current_aqi = int(latest_data["aqi"])
+        category, _ = get_aqi_category(current_aqi)
+        ts = pd.to_datetime(latest_data["timestamp"])
+        st.metric("AQI (measured)", current_aqi, category)
+        st.caption(f"Last measurement: {ts.strftime('%Y-%m-%d %H:%M')}")
+    else:
+        st.info("No AQI data found yet. Run the pipelines to populate MongoDB.")
+
+with model_col:
+    st.subheader("Model snapshot")
+    if registry:
+        best_name = registry["best_model"]
+        best_metrics = registry["models"][best_name]
+        st.metric("Best model", best_name.upper())
+        st.metric("R² score", best_metrics["r2"])
+        st.caption("Model is retrained daily from the latest features.")
+    else:
+        st.info("No model registry found. Train a model first.")
+
+# --- Forecast section ---
+st.markdown("---")
+st.subheader("3‑day forecast")
 
 if not predictions_df.empty:
-    # Create forecast chart
     fig = px.line(
         predictions_df,
-        x='timestamp',
-        y='predicted_aqi',
-        title='Next 72 Hours AQI Prediction',
-        labels={'predicted_aqi': 'Predicted AQI', 'timestamp': 'Date & Time'}
+        x="timestamp",
+        y="predicted_aqi",
+        labels={"predicted_aqi": "Predicted AQI", "timestamp": "Time"},
     )
-    
-    # Add AQI category zones
-    fig.add_hrect(y0=0, y1=50, fillcolor="green", opacity=0.1, line_width=0)
-    fig.add_hrect(y0=50, y1=100, fillcolor="yellow", opacity=0.1, line_width=0)
-    fig.add_hrect(y0=100, y1=150, fillcolor="orange", opacity=0.1, line_width=0)
-    fig.add_hrect(y0=150, y1=200, fillcolor="red", opacity=0.1, line_width=0)
-    
-    fig.update_layout(height=400)
+
+    # AQI zones
+    fig.add_hrect(y0=0, y1=50, fillcolor="green", opacity=0.08, line_width=0)
+    fig.add_hrect(y0=50, y1=100, fillcolor="yellow", opacity=0.08, line_width=0)
+    fig.add_hrect(y0=100, y1=150, fillcolor="orange", opacity=0.08, line_width=0)
+    fig.add_hrect(y0=150, y1=200, fillcolor="red", opacity=0.08, line_width=0)
+
+    fig.update_layout(height=360, showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
-    
-    # Daily summary
-    st.subheader("Daily Summary")
-    
-    predictions_df['date'] = predictions_df['timestamp'].dt.date
-    daily_summary = predictions_df.groupby('date')['predicted_aqi'].agg(['mean', 'min', 'max']).reset_index()
-    daily_summary.columns = ['Date', 'Avg AQI', 'Min AQI', 'Max AQI']
-    daily_summary['Avg AQI'] = daily_summary['Avg AQI'].round(0).astype(int)
-    daily_summary['Min AQI'] = daily_summary['Min AQI'].round(0).astype(int)
-    daily_summary['Max AQI'] = daily_summary['Max AQI'].round(0).astype(int)
-    
-    st.dataframe(daily_summary, use_container_width=True, hide_index=True)
-    
-    # Show overall AQI range
-    overall_min = predictions_df['predicted_aqi'].min()
-    overall_max = predictions_df['predicted_aqi'].max()
-    st.caption(f"📊 Overall AQI Range: {int(overall_min)}-{int(overall_max)}")
 
-else:
-    st.warning("No predictions available. Run prediction pipeline first.")
-
-# Row 3: Model Comparison
-st.header("🤖 Model Comparison")
-
-if registry:
-    models_data = registry['models']
-    
-    # Create comparison dataframe
-    comparison_df = pd.DataFrame({
-        'Model': ['Random Forest', 'XGBoost', 'LightGBM'],
-        'R² Score': [
-            models_data['random_forest']['r2'],
-            models_data['xgboost']['r2'],
-            models_data['lightgbm']['r2']
-        ],
-        'RMSE': [
-            models_data['random_forest']['rmse'],
-            models_data['xgboost']['rmse'],
-            models_data['lightgbm']['rmse']
-        ],
-        'MAE': [
-            models_data['random_forest']['mae'],
-            models_data['xgboost']['mae'],
-            models_data['lightgbm']['mae']
-        ]
-    })
-    
-    # Highlight best model
-    best_model_idx = comparison_df['R² Score'].idxmax()
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.dataframe(
-            comparison_df.style.highlight_max(subset=['R² Score'], color='lightgreen')
-                              .highlight_min(subset=['RMSE', 'MAE'], color='lightgreen'),
-            use_container_width=True,
-            hide_index=True
+    with st.expander("Daily summary", expanded=True):
+        predictions_df["date"] = predictions_df["timestamp"].dt.date
+        daily_summary = (
+            predictions_df.groupby("date")["predicted_aqi"].agg(["mean", "min", "max"]).reset_index()
         )
-    
-    with col2:
-        st.success(f"**Best Model:** {comparison_df.loc[best_model_idx, 'Model']}")
-        st.info(f"**R² Score:** {comparison_df.loc[best_model_idx, 'R² Score']}")
-        st.info(f"**RMSE:** {comparison_df.loc[best_model_idx, 'RMSE']}")
-        st.info(f"**MAE:** {comparison_df.loc[best_model_idx, 'MAE']}")
-    
-    # Model performance chart
-    fig = go.Figure()
-    
-    fig.add_trace(go.Bar(
-        name='R² Score',
-        x=comparison_df['Model'],
-        y=comparison_df['R² Score'],
-        marker_color='lightblue'
-    ))
-    
-    fig.update_layout(
-        title='Model Performance Comparison (R² Score)',
-        yaxis_title='R² Score',
-        height=300
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
+        daily_summary.columns = ["Date", "Avg AQI", "Min AQI", "Max AQI"]
+        daily_summary["Avg AQI"] = daily_summary["Avg AQI"].round(0).astype(int)
+        daily_summary["Min AQI"] = daily_summary["Min AQI"].round(0).astype(int)
+        daily_summary["Max AQI"] = daily_summary["Max AQI"].round(0).astype(int)
 
+        st.dataframe(daily_summary, use_container_width=True, hide_index=True)
+
+        overall_min = predictions_df["predicted_aqi"].min()
+        overall_max = predictions_df["predicted_aqi"].max()
+        st.caption(f"Overall forecast range: {int(overall_min)}–{int(overall_max)} AQI")
 else:
-    st.warning("No model registry found. Run training pipeline first.")
+    st.info("No predictions available. Generate a 3‑day forecast from the sidebar.")
+
+# --- Model comparison (optional details) ---
+st.markdown("---")
+with st.expander("Model comparison (details)", expanded=False):
+    if registry:
+        models_data = registry["models"]
+        comparison_df = pd.DataFrame(
+            {
+                "Model": ["Random Forest", "XGBoost", "LightGBM"],
+                "R²": [
+                    models_data["random_forest"]["r2"],
+                    models_data["xgboost"]["r2"],
+                    models_data["lightgbm"]["r2"],
+                ],
+                "RMSE": [
+                    models_data["random_forest"]["rmse"],
+                    models_data["xgboost"]["rmse"],
+                    models_data["lightgbm"]["rmse"],
+                ],
+                "MAE": [
+                    models_data["random_forest"]["mae"],
+                    models_data["xgboost"]["mae"],
+                    models_data["lightgbm"]["mae"],
+                ],
+            }
+        )
+
+        best_idx = comparison_df["R²"].idxmax()
+        st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+        st.caption(
+            f"Best model: {comparison_df.loc[best_idx, 'Model']} "
+            f"(R²={comparison_df.loc[best_idx, 'R²']}, "
+            f"RMSE={comparison_df.loc[best_idx, 'RMSE']}, "
+            f"MAE={comparison_df.loc[best_idx, 'MAE']})"
+        )
+    else:
+        st.info("Model metrics will appear here after the first training run.")
 
 # Footer
 st.markdown("---")
