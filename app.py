@@ -25,6 +25,10 @@ st.set_page_config(
     layout="wide"
 )
 
+# Simple flag: on Streamlit Cloud we expect MONGODB_URI to be in st.secrets,
+# while local runs typically use .env instead.
+RUNNING_IN_CLOUD = "MONGODB_URI" in st.secrets
+
 
 def get_aqi_category(aqi):
     """Get AQI category and color."""
@@ -131,7 +135,7 @@ def load_latest_aqi():
 
 # Main Dashboard
 st.title("Pearls AQI Monitor")
-st.caption("Clean 3‑day AQI outlook for Islamabad, powered by your own pipeline.")
+st.caption("Clean 3‑day AQI outlook for Islamabad, powered by Muhammad Talha.")
 
 # Sidebar – simplified, project-specific copy
 st.sidebar.title("Pearls AQI")
@@ -143,13 +147,20 @@ st.sidebar.markdown(
 
 # Sidebar actions
 st.sidebar.markdown("### Actions")
-if st.sidebar.button("Collect fresh data", use_container_width=True):
-    collect_fresh_data()
-st.sidebar.caption("Fetch latest hour from OpenMeteo into MongoDB.")
+if RUNNING_IN_CLOUD:
+    st.sidebar.write(
+        "On Streamlit Cloud, data and forecasts are refreshed automatically "
+        "by GitHub Actions.\n\n"
+        "Use these buttons only when running the app locally."
+    )
+else:
+    if st.sidebar.button("Collect fresh data", use_container_width=True):
+        collect_fresh_data()
+    st.sidebar.caption("Fetch latest hour from OpenMeteo into MongoDB.")
 
-if st.sidebar.button("Regenerate 3‑day forecast", use_container_width=True):
-    refresh_predictions()
-st.sidebar.caption("Run prediction pipeline with the latest best model.")
+    if st.sidebar.button("Regenerate 3‑day forecast", use_container_width=True):
+        refresh_predictions()
+    st.sidebar.caption("Run prediction pipeline with the latest best model.")
 
 # Load data
 registry = load_model_registry()
@@ -218,7 +229,21 @@ if not predictions_df.empty:
     fig.add_hrect(y0=100, y1=150, fillcolor="orange", opacity=0.08, line_width=0)
     fig.add_hrect(y0=150, y1=200, fillcolor="red", opacity=0.08, line_width=0)
 
-    fig.update_layout(height=360, showlegend=False)
+    # Make the forecast line stand out
+    fig.update_traces(
+        line=dict(color="#4ade80", width=3),
+        hovertemplate="%{x|%b %d, %H:%M}<br>AQI: %{y}<extra></extra>",
+    )
+
+    # Clean layout: tighter margins, subtle grid
+    fig.update_layout(
+        height=360,
+        showlegend=False,
+        margin=dict(l=40, r=20, t=10, b=40),
+        yaxis=dict(title="Predicted AQI", gridcolor="rgba(255,255,255,0.05)"),
+        xaxis=dict(title="Time", showgrid=False),
+    )
+
     st.plotly_chart(fig, use_container_width=True)
 
     with st.expander("Daily summary", expanded=True):
